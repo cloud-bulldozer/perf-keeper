@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import logging
 import os
+import asyncio
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from perfscale_agent.mcp_client import get_mcp_tools
 from perfscale_agent.tools.artifact import fetch_artifact
 from perfscale_agent.tools.github_pr import fetch_github_pull_request
 from perfscale_agent.prow_utils import extract_job_info, set_job_state, passed_condition, get_failed_test
@@ -46,32 +48,28 @@ _USER_TASK = (
 )
 
 
-
-
 def create_agent() -> StateGraph:
     """Create the LangGraph diagnosis agent."""
 
 
     def prow_job_analysis(state: AgentState) -> dict:
-        prior_msgs = len(state.get("messages") or [])
-        phase = "initial LLM call" if prior_msgs == 0 else "continuing after tool result(s)"
+        phase = "initial LLM call" if len(state["messages"]) == 0 else "continuing after tool result(s)"
         logger.info(
-            "prow_job_analysis: %s (model=%s, prior_messages=%d)",
+            "prow_job_analysis: %s (model=%s)",
             phase,
             MODEL_NAME,
-            prior_msgs,
         )
         llm = ChatGoogleGenerativeAI(
             model=MODEL_NAME,
             temperature=0,
         )
-        llm_with_tools = llm.bind_tools(TOOLS)
+        agent = llm.bind_tools(TOOLS)
         with open("perfscale_agent/skills/prow-diagnosis-short.md", "r") as f:
             system_prompt = f.read()
         prompt = system_prompt.format(**state,
             artifacts_base=os.getenv("PROW_ARTIFACTS_URL", "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"),
         )
-        if prior_msgs == 0:
+        if len(state["messages"]) == 0:
             messages = [
                 SystemMessage(content=prompt),
                 HumanMessage(content=_USER_TASK),
@@ -88,18 +86,20 @@ def create_agent() -> StateGraph:
             "prow_job_analysis: invoking model (%d message(s) in this request)",
             len(messages),
         )
-        response = llm_with_tools.invoke(messages)
+        response = agent.invoke(messages)
         if response.tool_calls:
             logger.info("Decision: Calling tool '%s'", response.tool_calls[0]['name'])
         return {"messages": [response]}
 
+    mcp_tools = asyncio.run(get_mcp_tools())
+    tools = TOOLS + mcp_tools
     workflow = StateGraph(AgentState)
 
     workflow.add_node("extract_job_info", extract_job_info)
     workflow.add_node("set_job_state", set_job_state)
     workflow.add_node("get_failed_test", get_failed_test)
     workflow.add_node("prow_job_analysis", prow_job_analysis)
-    workflow.add_node("tools", ToolNode(TOOLS))
+    workflow.add_node("tools", ToolNode(tools))
 
 
     # Define the flow
