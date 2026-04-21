@@ -1,4 +1,4 @@
-from typing import Annotated, TypedDict
+from typing import Annotated, Literal, NotRequired, TypedDict
 from langgraph.graph.message import add_messages
 
 # AgentState is the state of the agent
@@ -14,3 +14,7 @@ class AgentState(TypedDict):
     job_result: str
     job_analysis: str
     version_diffs: str
+    # Which analysis subgraph is active; used to route tools back to one node only.
+    analysis_route: NotRequired[Literal["orion_analysis", "generic_analysis"]]
+    # Tool-free consolidated report (Markdown) from the final_report node.
+    final_report: NotRequired[str]

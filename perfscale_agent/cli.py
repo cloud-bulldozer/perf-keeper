@@ -52,6 +52,10 @@ async def run_non_interactive(job_url: str):
     if result.get("passed"):
         logger.info("✅ Job passed. No diagnosis required.")
         return
+    final = (result.get("final_report") or "").strip()
+    if final:
+        print(f"\n{final}\n")
+        return
     messages = result.get("messages") or []
     text = _last_diagnosis_text(messages)
     if text:
