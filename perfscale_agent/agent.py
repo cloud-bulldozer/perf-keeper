@@ -48,11 +48,12 @@ _USER_TASK = (
 )
 
 
-def create_agent() -> StateGraph:
+async def create_agent() -> StateGraph:
     """Create the LangGraph diagnosis agent."""
 
-
-    def prow_job_analysis(state: AgentState) -> dict:
+    mcp_tools = await get_mcp_tools()
+    tools = TOOLS + mcp_tools # Combined list
+    async def prow_job_analysis(state: AgentState) -> dict:
         phase = "initial LLM call" if len(state["messages"]) == 0 else "continuing after tool result(s)"
         logger.info(
             "prow_job_analysis: %s (model=%s)",
@@ -63,7 +64,7 @@ def create_agent() -> StateGraph:
             model=MODEL_NAME,
             temperature=0,
         )
-        agent = llm.bind_tools(TOOLS)
+        agent = llm.bind_tools(tools)
         with open("perfscale_agent/skills/prow-diagnosis-short.md", "r") as f:
             system_prompt = f.read()
         prompt = system_prompt.format(**state,
@@ -91,8 +92,6 @@ def create_agent() -> StateGraph:
             logger.info("Decision: Calling tool '%s'", response.tool_calls[0]['name'])
         return {"messages": [response]}
 
-    mcp_tools = asyncio.run(get_mcp_tools())
-    tools = TOOLS + mcp_tools
     workflow = StateGraph(AgentState)
 
     workflow.add_node("extract_job_info", extract_job_info)

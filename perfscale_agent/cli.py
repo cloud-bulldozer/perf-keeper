@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import asyncio
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage
@@ -43,11 +44,11 @@ def _last_diagnosis_text(messages: list[BaseMessage]) -> str | None:
     return _text_from_message_content(messages[-1].content)
 
 
-def run_non_interactive(job_url: str):
+async def run_non_interactive(job_url: str):
     logger = logging.getLogger(__name__)
     load_dotenv()
-    agent = create_agent()
-    result = agent.invoke({"job_url": job_url})
+    agent = await create_agent()
+    result = await agent.ainvoke({"job_url": job_url})
     if result.get("passed"):
         logger.info("✅ Job passed. No diagnosis required.")
         return
@@ -81,7 +82,7 @@ def main():
             parser.error("Invalid Prow job URL")
     else:
         parser.error("Prow job URL is required")
-    run_non_interactive(args.prow_job_url)
+    asyncio.run(run_non_interactive(args.prow_job_url))
 
 if __name__ == "__main__":
     main()
