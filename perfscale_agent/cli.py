@@ -90,18 +90,34 @@ def main():
         action="store_true",
         help="After the run, print cumulative LLM input/output/total tokens",
     )
+    parser.add_argument(
+        "--server",
+        action="store_true",
+        help="Rest API server mode",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Server mode port (only used with --server)",
+    )
     args = parser.parse_args()
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper()),
         format="%(levelname)s %(name)s: %(message)s",
     )
+    if args.server:
+        import uvicorn
+        from perfscale_agent.server import app
+        uvicorn.run(app, host="0.0.0.0", port=args.port, log_level=args.log_level.lower())
+        return
     if args.prow_job_url:
         try:
             urlparse(args.prow_job_url)
         except ValueError:
             parser.error("Invalid Prow job URL")
     else:
-        parser.error("Prow job URL is required")
+        parser.error("--prow-job-url is required (or use --server for REST API mode)")
     asyncio.run(
         run_non_interactive(args.prow_job_url, print_token_usage=args.print_token_usage)
     )
