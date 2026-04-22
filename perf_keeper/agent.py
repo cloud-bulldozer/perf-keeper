@@ -17,11 +17,11 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from perfscale_agent.mcp_client import get_mcp_tools
-from perfscale_agent.tools.artifact import fetch_artifact
-from perfscale_agent.tools.github_pr import fetch_github_pull_request
-from perfscale_agent.prow_utils import extract_job_info, set_job_state, passed_condition, get_failed_test
-from perfscale_agent.state import AgentState
+from perf_keeper.mcp_client import get_mcp_tools
+from perf_keeper.tools.artifact import fetch_artifact
+from perf_keeper.tools.github_pr import fetch_github_pull_request
+from perf_keeper.prow_utils import extract_job_info, set_job_state, passed_condition, get_failed_test
+from perf_keeper.state import AgentState
 
 load_dotenv()
 
@@ -73,7 +73,7 @@ async def create_agent() -> StateGraph:
 
     async def run_analysis(state: AgentState, prompt_file: str, node_name: str) -> dict:
         logger.info(f"Analysis Node: {node_name}")
-        with open(f"perfscale_agent/skills/{prompt_file}", "r") as f:
+        with open(f"perf_keeper/skills/{prompt_file}", "r") as f:
             system_prompt = f.read()
         prompt = system_prompt.format(**state,
             artifacts_base=os.getenv("PROW_ARTIFACTS_URL", "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"),
@@ -115,7 +115,7 @@ async def create_agent() -> StateGraph:
             temperature=os.getenv("LLM_TEMPERATURE", 0),
             max_tokens=os.getenv("MAX_OUTPUT_TOKENS", 1024),
         )
-        with open("perfscale_agent/skills/final-report.md", "r") as f:
+        with open("perf_keeper/skills/final-report.md", "r") as f:
             system_prompt = f.read().format(**state)
         messages: list[BaseMessage] = [
             SystemMessage(content=system_prompt),

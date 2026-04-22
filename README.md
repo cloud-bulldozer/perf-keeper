@@ -1,4 +1,4 @@
-# perfscale-agent
+# perf-keeper
 
 AI agent for diagnosing OpenShift Performance & Scale regressions in Prow CI jobs.
 
@@ -43,7 +43,7 @@ The agent is built on [LangGraph](https://github.com/langchain-ai/langgraph) and
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd agentic-perfscale
+cd perf-keeper
 
 # Install dependencies with uv (recommended)
 uv sync
@@ -100,15 +100,15 @@ The agent can be run in CLI mode to diagnose a failed Prow job.
 
 ```bash
 # Diagnose a failed Prow job
-perfscale-agent --prow-job-url "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/<job-name>/<build-id>/"
+perf-keeper --prow-job-url "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/<job-name>/<build-id>/"
 
 # Show LLM token usage after the run
-perfscale-agent --prow-job-url "https://prow.ci.openshift.org/view/gs/..." --print-token-usage
+perf-keeper --prow-job-url "https://prow.ci.openshift.org/view/gs/..." --print-token-usage
 ```
 
 If the job passed, the agent exits early with a success message. Otherwise, it prints the final RCA report to stdout.
 
-> **Note**: Supported flags can be seen with `perfscale-agent --help`.
+> **Note**: Supported flags can be seen with `perf-keeper --help`.
 
 
 ## Server mode
@@ -117,7 +117,7 @@ The agent can be run in server mode to diagnose a failed Prow job via a REST API
 
 ```bash
 # Start the server
-perfscale-agent --server --port 8080
+perf-keeper --server --port 8080
 ```
 
 The server will listen on port 8080 and will diagnose the failed Prow job when a POST request is made to the `/analyze` endpoint.

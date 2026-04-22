@@ -1,16 +1,18 @@
-"""CLI entry point for the perfscale diagnosis agent."""
+"""CLI entry point for the perf-keeper diagnosis agent."""
 from __future__ import annotations
 
 import argparse
 import logging
 import os
 import asyncio
+import uvicorn
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage
 from urllib.parse import urlparse
 
-from perfscale_agent.agent import create_agent
+from perf_keeper.agent import create_agent
+from perf_keeper.server import app
 
 
 def _text_from_message_content(content: object) -> str | None:
@@ -107,8 +109,6 @@ def main():
         format="%(levelname)s %(name)s: %(message)s",
     )
     if args.server:
-        import uvicorn
-        from perfscale_agent.server import app
         uvicorn.run(app, host="0.0.0.0", port=args.port, log_level=args.log_level.lower())
         return
     if args.prow_job_url:

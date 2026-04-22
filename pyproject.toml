@@ -1,5 +1,5 @@
 [project]
-name = "perfscale-agent"
+name = "perf-keeper"
 version = "0.1.0"
 description = "AI agent for diagnosing OpenShift Perf & Scale regressions"
 requires-python = ">=3.11"
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-perfscale-agent = "perfscale_agent.cli:main"
+perf-keeper = "perf_keeper.cli:main"
 
 [project.optional-dependencies]
 dev = [

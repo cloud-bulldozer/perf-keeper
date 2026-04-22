@@ -785,7 +785,7 @@ wheels = [
 ]
 
 [[package]]
-name = "perfscale-agent"
+name = "perf-keeper"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

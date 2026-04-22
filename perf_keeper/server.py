@@ -1,4 +1,4 @@
-"""REST API server for the perfscale diagnosis agent."""
+"""REST API server for the perf-keeper diagnosis agent."""
 from __future__ import annotations
 
 import logging
@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel, HttpUrl
 
-from perfscale_agent.agent import create_agent
-from perfscale_agent.cli import _last_diagnosis_text
+from perf_keeper.agent import create_agent
 
 logger = logging.getLogger(__name__)
 
@@ -24,27 +23,24 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Perfscale Diagnosis Agent", lifespan=lifespan)
+app = FastAPI(title="Perf Keeper", lifespan=lifespan)
 
 
-class AnalyzeRequest(BaseModel):
+class AgentData(BaseModel):
     job_url: HttpUrl
 
 
-class AnalyzeResponse(BaseModel):
+class AgentResponse(BaseModel):
     passed: bool
     analysis: str
 
 
-@app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(req: AnalyzeRequest):
+@app.post("/analyze", response_model=AgentResponse)
+async def analyze(req: AgentData):
     logger.info("Received analysis request for %s", req.job_url)
     state = await _agent.ainvoke({"job_url": str(req.job_url)})
     passed = state["passed"]
     if passed:
-        return AnalyzeResponse(result=True, analysis="Job passed. No diagnosis required.")
+        return AgentResponse(passed=True, analysis="Job passed. No diagnosis required.")
     final = (state.get("final_report") or "").strip()
-    if not final:
-        messages = state.get("messages") or []
-        final = _last_diagnosis_text(messages) or "No analysis produced."
-    return AnalyzeResponse(result=False, analysis=final)
+    return AgentResponse(passed=False, analysis=final)

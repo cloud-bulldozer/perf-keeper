@@ -4,7 +4,7 @@ import re
 import os
 from langchain_core.messages import SystemMessage
 from langgraph.graph import END
-from perfscale_agent.state import AgentState
+from perf_keeper.state import AgentState
 import httpx
 
 PROW_ARTIFACTS_URL = os.getenv("PROW_ARTIFACTS_URL", "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com")
