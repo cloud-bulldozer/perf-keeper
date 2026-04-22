@@ -16,28 +16,28 @@ Produce **one** final report in the exact structure below. Use Markdown headings
 
 ## Required output structure
 
-### 1. Executive summary
+1. Job summary
 
-One short paragraph: what failed and the most likely cause (as supported by the conversation).
+One short paragraph: what failed
 
-### 2. Job facts
+- Job URL: {job_url}
+- Failed test: {failed_test}
 
-- **Job URL**: `{job_url}`
-- **Failed test**: `{failed_test}`
-
-### 3. Findings
+2. Findings
 
 Bullet list of concrete facts from the investigation (log excerpts, metrics, Orion regression lines, release diff summaries, etc.). Each bullet should be verifiable from the conversation.
 
-### 4. Root cause
+3. Root cause
 
 Paragraph(s) explaining the chain from evidence to conclusion. If the conversation gave competing hypotheses, state the leading one and what would falsify it.
 
-### 5. Suspect changes
+4. Suspect changes
 
-If payload / RHCOS / component RPM / GitHub PR analysis was discussed, summarize suspect changes here. If not discussed, write: *Not covered in the analysis thread.*
+If payload / RHCOS / component RPM / GitHub PR analysis was discussed, summarize suspect changes here. If not discussed, write: *Not covered in the analysis thread.*. Use the format
 
-### 6. Classification
+- PR URL: <PR_URL> - <PR_DESCRIPTION>
+
+5. Classification
 
 Pick **exactly one** label (use this exact token on the line after the heading):
 
@@ -53,4 +53,4 @@ Pick **exactly one** label (use this exact token on the line after the heading):
 
 Format:
 
-**Classification:** `<token>`
+Classification: <token>

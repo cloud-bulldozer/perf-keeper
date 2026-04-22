@@ -18,3 +18,6 @@ class AgentState(TypedDict):
     analysis_route: NotRequired[Literal["orion_analysis", "generic_analysis"]]
     # Tool-free consolidated report (Markdown) from the final_report node.
     final_report: NotRequired[str]
+    # Cumulative LLM token usage across analysis + final_report invocations.
+    input_tokens: NotRequired[int]
+    output_tokens: NotRequired[int]

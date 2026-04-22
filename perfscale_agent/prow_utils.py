@@ -56,7 +56,7 @@ def set_job_state(state: AgentState) -> bool:
         resp = httpx.get(url)
         resp.raise_for_status()
         json_data = resp.json()
-        logger.info(f"set_job_state: job {job_name} {build_id} passed: {json_data.get('passed')}")
+        logger.info(f"set_job_state: job passed: {json_data.get('passed')}")
         return {
             "passed": json_data.get("passed"),
         }
@@ -75,7 +75,6 @@ def passed_condition(state: AgentState) -> str:
 def get_failed_test(state: AgentState) -> dict:
     job_name = state["job_name"]
     build_id = state["build_id"]
-    logger.info(f"get_failed_test: job_name={job_name} build_id={build_id}")
     url = f"{PROW_ARTIFACTS_URL}/gcs/test-platform-results/logs/{job_name}/{build_id}/artifacts/ci-operator.log"
     resp = httpx.get(url)
     # Look for the line containing

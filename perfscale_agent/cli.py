@@ -44,7 +44,14 @@ def _last_diagnosis_text(messages: list[BaseMessage]) -> str | None:
     return _text_from_message_content(messages[-1].content)
 
 
-async def run_non_interactive(job_url: str):
+def _print_token_totals(result: dict) -> None:
+    inp = int(result.get("input_tokens") or 0)
+    out = int(result.get("output_tokens") or 0)
+    total = inp + out
+    print(f"LLM tokens — input: {inp}  output: {out}  total: {total}")
+
+
+async def run_non_interactive(job_url: str, *, print_token_usage: bool = False):
     logger = logging.getLogger(__name__)
     load_dotenv()
     agent = await create_agent()
@@ -55,6 +62,8 @@ async def run_non_interactive(job_url: str):
     final = (result.get("final_report") or "").strip()
     if final:
         print(f"\n{final}\n")
+        if print_token_usage:
+            _print_token_totals(result)
         return
     messages = result.get("messages") or []
     text = _last_diagnosis_text(messages)
@@ -62,6 +71,8 @@ async def run_non_interactive(job_url: str):
         print(f"\n{text}\n")
     else:
         logger.warning("No assistant text to print (e.g. last turn was tool calls only).")
+    if print_token_usage:
+        _print_token_totals(result)
 
 def main():
     parser = argparse.ArgumentParser(description="OpenShift Perf & Scale Diagnosis Agent",
@@ -73,6 +84,11 @@ def main():
         default=os.environ.get("LOGLEVEL", "INFO"),
         choices=("debug", "info", "warning", "error"),
         help="Log level for agent progress (default: info, or LOGLEVEL env)",
+    )
+    parser.add_argument(
+        "--print-token-usage",
+        action="store_true",
+        help="After the run, print cumulative LLM input/output/total tokens",
     )
     args = parser.parse_args()
     logging.basicConfig(
@@ -86,7 +102,9 @@ def main():
             parser.error("Invalid Prow job URL")
     else:
         parser.error("Prow job URL is required")
-    asyncio.run(run_non_interactive(args.prow_job_url))
+    asyncio.run(
+        run_non_interactive(args.prow_job_url, print_token_usage=args.print_token_usage)
+    )
 
 if __name__ == "__main__":
     main()

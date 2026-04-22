@@ -27,6 +27,22 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
+def _usage_from_ai_message(msg: BaseMessage) -> tuple[int, int]:
+    """Return (input_tokens, output_tokens) from an AIMessage, or (0, 0) if absent."""
+    if not isinstance(msg, AIMessage):
+        return (0, 0)
+    meta = getattr(msg, "usage_metadata", None)
+    if not isinstance(meta, dict):
+        return (0, 0)
+    inp = meta.get("input_tokens")
+    out = meta.get("output_tokens")
+    try:
+        return (int(inp) if inp is not None else 0, int(out) if out is not None else 0)
+    except (TypeError, ValueError):
+        return (0, 0)
+
+
 TOOLS = [
     fetch_artifact,
     fetch_github_pull_request,
@@ -70,7 +86,12 @@ async def create_agent() -> StateGraph:
             len(messages),
         )
         response = agent.invoke(messages)
-        return {"messages": [response]}
+        d_in, d_out = _usage_from_ai_message(response)
+        return {
+            "messages": [response],
+            "input_tokens": state.get("input_tokens", 0) + d_in,
+            "output_tokens": state.get("output_tokens", 0) + d_out,
+        }
 
     async def orion_analysis(state: AgentState) -> dict:
         return await run_analysis(state, "orion-analysis.md", "orion_analysis")
@@ -107,7 +128,13 @@ async def create_agent() -> StateGraph:
         ]
         messages.extend(state.get("messages", []))
         response = report_llm.invoke(messages)
-        return {"messages": [response], "final_report": response.content.strip()}
+        d_in, d_out = _usage_from_ai_message(response)
+        return {
+            "messages": [response],
+            "final_report": response.content.strip(),
+            "input_tokens": state.get("input_tokens", 0) + d_in,
+            "output_tokens": state.get("output_tokens", 0) + d_out,
+        }
 
     def set_analysis_route(state: AgentState) -> dict:
         """Record which analysis branch to use and return to after tools (orion vs generic)."""
