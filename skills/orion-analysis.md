@@ -1,8 +1,18 @@
 # Orion analysis
 
-Orion stands as a powerful command-line tool designed for identifying regressions within perf-scale CPT (Continuous Performance Testing) runs, leveraging metadata provided during the process.
+Orion stands as a powerful command-line tool designed for identifying regressions within perf-scale CPT (Continuous Performance Testing) runs, leveraging metadata provided during the process and comparing it with data from previous performance test executions
+
+## Job under analysis
+
+- **Prow job URL:** {job_url}
+- **Job name / build ID:** `{job_name}` / `{build_id}`
+- **Failed step / test:** `{failed_step}` / `{failed_test}`
+
+Use the artifact paths below (and tools). **Do not** ask the user for the job link; it is listed above.
 
 ## Tools
+
+You may use **only** the tools listed below.
 
 1. **`fetch_artifact(url)`** — HTTP GET for **non-GitHub** URLs: Prow/gcsweb artifacts, raw logs, JSON, etc.
 
@@ -14,13 +24,14 @@ The artifacts base URL is:
 
 `{artifacts_base}/gcs/test-platform-results/logs/{job_name}/{build_id}/`
 
+## Orion test types
+
 There can be two types of Orion tests:
 
 ### A) Orion report test (failed test name is "openshift-qe-orion-report")
 
-Orion is a performance regression detection tool, that gets executed once the benchmarks are finished. The openshift-qe-orion-report job generates a report that contains information about all the potential performance regressions from the previous benchmark executions.
 
-Fetch the regression report
+Fetch the regression report from the URL below using `fetch_artifact(url)`, this report may contain information about performance regressions observed in multiple tests:
 
 ```
 {artifacts_base}/gcs/test-platform-results/logs/{job_name}/{build_id}/artifacts/{failed_step}/{failed_test}/artifacts/orion-report-summary.txt
@@ -48,21 +59,22 @@ Related PRs (2):
   * ...
 ```
 
-### B) Orion failure (failed test name contains "openshift-qe-orion" and is different from "openshift-qe-orion-report")
+### B) Orion failure (failed test name contains the substring "openshift-qe-orion" and is different from "openshift-qe-orion-report")
 
-Orion is a performance regression detection tool, these tests are run after each benchmark execution.
 
-Exit code meanings:
+Fetch the orion log using `fetch_artifact(url)` from the URL:
+
+```
+{artifacts_base}/gcs/test-platform-results/logs/{job_name}/{build_id}/artifacts/{failed_step}/{failed_test}/build-log.txt
+```
+
+Orion can exit with mutiple exit codes, meaning:
+
 - **0**: Success
 - **1**: User/config/input error: Used for CLI/config failures
 - **2**: Performance regression detected
 - **3**: No data found: The test did not run because there was no data to analyze
 
-Fetch the orion log at:
-
-```
-{artifacts_base}/gcs/test-platform-results/logs/{job_name}/{build_id}/artifacts/{failed_step}/{failed_test}/build-log.txt
-```
 
 ## Diagnosis Procedure
 
@@ -70,12 +82,13 @@ Follow these steps in order. Do not skip steps. Think carefully between each ste
 
 ### Step 1: Compare the payload versions
 
-If there's a performance regression derived from a different version of the payload, use **`openshift-release`** to compare `regresssion_version` and `previous_version`. Then for eery PR discovered in the diff, call **`fetch_github_pull_request`**. Summarize each PR’s intent from the returned **title** and **body** in your Evidence section,
+If there's a performance regression derived from a different version of the payload, use the tool **`compare_releases`** from **`openshift-release`** to compare `regresssion_version` and `previous_version`. 
+Use the fucntion **`fetch_github_pull_request`** to get the PR title and description. Summarize each PR’s intent from the returned **title** and **body** in your Evidence section,
 
 ### Step 2: Compare the RHCOS versions
 
-If the diff doesn't contain any relevant PR, you can compare the RHCOS RPM differences between the RHCOS (Red Hat Core OS) versions of the current and previous payload.
+If the diff doesn't contain any relevant PR, compare the RHCOS RPM differences between the RHCOS (Red Hat Core OS) versions of the current and previous payload using the tool **`compare_rhcos_rpms`** from **`openshift-release`**
 
 ### Step 3: Compare the RPM differences
 
-And last resort, compare the RPM differences in the CNI component `ovn-kubernetes`, focusing in the `ovn` packages
+And last resort, compare the RPM differences in the CNI component `ovn-kubernetes`, focusing in the `ovn` packages using the tool **`get_component_rpms`** from **`openshift-release`**

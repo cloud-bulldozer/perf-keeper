@@ -1,18 +1,13 @@
-"""LangGraph agent for diagnosing OpenShift Perf & Scale issues.
-
-The agent follows a diagnosis workflow:
-1. Understand the problem (failed job, regression, etc.)
-2. Gather evidence from prow jobs (logs, metrics)
-3. Identify payload changes via Sippy
-4. Analyze suspect PRs
-5. Correlate findings and produce a diagnosis
-"""
-from __future__ import annotations
-
 import logging
 import os
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -20,7 +15,7 @@ from langgraph.prebuilt import ToolNode
 from perf_keeper.mcp_client import get_mcp_tools
 from perf_keeper.tools.artifact import fetch_artifact
 from perf_keeper.tools.github_pr import fetch_github_pull_request
-from perf_keeper.prow_utils import extract_job_info, set_job_state, passed_condition, get_failed_test
+from perf_keeper.prow_utils import extract_job_info, passed_condition, get_failed_test_info
 from perf_keeper.state import AgentState
 
 load_dotenv()
@@ -50,42 +45,83 @@ TOOLS = [
 
 MODEL_NAME = os.getenv(
     "MODEL_NAME",
-    "gemini-2.5-pro",
+    "gemini-2.5-flash",
 )
+
+
+SKILLS_DIR = os.getenv("SKILLS_DIR", "skills")
 
 # Gemini requires an assistant tool-call turn to follow a *user* turn (or a tool
 # result). We only persist AIMessage/ToolMessage in state, so follow-up turns
 # must replay the same opening user message before history.
 _USER_TASK = (
-    "Diagnose this prow job the system instructions"
+    "Diagnose this OpenShift prow job"
 )
-
 
 async def create_agent() -> StateGraph:
     """Create the LangGraph diagnosis agent."""
 
+    logger.info(f"Using model: {MODEL_NAME}")
     mcp_tools = await get_mcp_tools()
-    tools = TOOLS + mcp_tools   # Combine the tools from the agent and the MCP server
-    agent = ChatGoogleGenerativeAI(
-        model=MODEL_NAME,
-        temperature=0,
-    ).bind_tools(tools)
+    ALL_TOOLS = TOOLS + mcp_tools
+    llm_base = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0)
+    llm_analysis_force_tools = llm_base.bind_tools(ALL_TOOLS, tool_choice="any")
+    llm_analysis_auto = llm_base.bind_tools(ALL_TOOLS)
 
-    async def run_analysis(state: AgentState, prompt_file: str, node_name: str) -> dict:
-        logger.info(f"Analysis Node: {node_name}")
-        with open(f"perf_keeper/skills/{prompt_file}", "r") as f:
+    async def classify_failed_test(state: AgentState) -> dict:
+        """Get the type of the failed test from the state."""
+        with open(f"{SKILLS_DIR}/test-classifier.md", "r") as f:
+            system_prompt = f.read()    
+        system_prompt = system_prompt.format(**state,
+            artifacts_base=os.getenv("PROW_ARTIFACTS_URL", "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"),
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content="You're a test classifier. You need to classify the type of test that failed."),
+        ]
+        messages.extend(state.get("messages", []))
+        llm = llm_base.bind_tools(TOOLS)
+        response = llm.invoke(messages)
+        out: dict = {"messages": [response]}
+        if isinstance(response, AIMessage) and getattr(response, "tool_calls", None):
+            logger.info("Classifier requested tools; deferring failed_test_type until next turn.")
+            return out
+        failed_test_type = response.content[0]['text'] if isinstance(response.content, list) else response.content
+        logger.info("Failed test type: %r", failed_test_type)
+        out["failed_test_type"] = failed_test_type
+        return out
+
+    async def run_analysis(state: AgentState) -> dict:
+        failed_test_type = state.get("failed_test_type")
+        prompt_file = f"{failed_test_type}-analysis.md" if failed_test_type else "generic-test-analysis.md"
+        node_name = f"{failed_test_type}_analysis" if failed_test_type else "generic_analysis"
+        logger.info(f"Running analysis: {prompt_file}")
+        with open(f"{SKILLS_DIR}/{prompt_file}", "r") as f:
             system_prompt = f.read()
         prompt = system_prompt.format(**state,
             artifacts_base=os.getenv("PROW_ARTIFACTS_URL", "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"),
         )
         messages = [SystemMessage(content=prompt), HumanMessage(content=_USER_TASK)]
-        if state["messages"]:
-            messages.extend(state["messages"])
+        prior = state.get("messages") or []
+        if prior:
+            messages.extend(prior)
+        # When the last turn is not tool output, require a tool call so analysis
+        # cannot no-op (empty content, 0 output tokens) before the tool node runs.
+        tail = prior[-1] if prior else None
+        # Bind ALL_TOOLS (artifact + GitHub + MCP). Binding only MCP tools forced
+        # bogus MCP calls (e.g. get_pull_request_info with url N/A) when the model
+        # needed fetch_artifact / fetch_github_pull_request per the skill.
+        invoke_llm = (
+            llm_analysis_force_tools
+            if not isinstance(tail, ToolMessage)
+            else llm_analysis_auto
+        )
         logger.info(
-            "prow_job_analysis: invoking model (%d message(s) in this request)",
+            "%s: invoking model (%d message(s))",
+            node_name,
             len(messages),
         )
-        response = agent.invoke(messages)
+        response = invoke_llm.invoke(messages)
         d_in, d_out = _usage_from_ai_message(response)
         return {
             "messages": [response],
@@ -93,103 +129,87 @@ async def create_agent() -> StateGraph:
             "output_tokens": state.get("output_tokens", 0) + d_out,
         }
 
-    async def orion_analysis(state: AgentState) -> dict:
-        return await run_analysis(state, "orion-analysis.md", "orion_analysis")
-
-    async def generic_analysis(state: AgentState) -> dict:
-        return await run_analysis(state, "generic-test-analysis.md", "generic_analysis")
-
-    def _analysis_routes_to_tools(state: AgentState) -> str:
+    def tools_required(state: AgentState) -> str:
         """Continue to tool execution, or to final report when the model returned text only."""
         msgs = state.get("messages") or []
+        if not msgs:
+            # e.g. a node returned non-message updates only; safe default is no tools.
+            return "next"
         last = msgs[-1]
-        if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
+        if last.tool_calls:
             return "tools"
-        return "final_report"
+        else:
+            return "next"
+
+    def route_after_tools(state: AgentState) -> str:
+        """Resume the correct node after ToolNode execution.
+
+        - If the classifier hasn't produced `failed_test_type` yet, tools were run for
+          the classifier, so return to `classify_failed_test`.
+        - Otherwise, tools were run for analysis, so return to `run_analysis`.
+        """
+        if not state.get("failed_test_type"):
+            return "classify_failed_test"
+        return "run_analysis"
 
     async def final_report(state: AgentState) -> dict:
         """Single tool-free pass: structured Markdown from the full message history."""
         logger.info("Analysis Node: final_report")
-        report_llm = ChatGoogleGenerativeAI(
-            model=MODEL_NAME,
-            temperature=os.getenv("LLM_TEMPERATURE", 0),
-            max_tokens=os.getenv("MAX_OUTPUT_TOKENS", 1024),
-        )
-        with open("perf_keeper/skills/final-report.md", "r") as f:
+        with open(f"{SKILLS_DIR}/final-report.md", "r") as f:
             system_prompt = f.read().format(**state)
-        messages: list[BaseMessage] = [
+        messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(
                 content=(
                     "The messages below are the full analysis thread. "
-                    "Output the final report per the system template."
+                    "Generate a final report based on the analysis thread using the format and the system template."
                 )
             ),
         ]
         messages.extend(state.get("messages", []))
-        response = report_llm.invoke(messages)
+        response = llm_base.invoke(messages)
         d_in, d_out = _usage_from_ai_message(response)
+        # The model may return a list of string, so we need to join them together.
+        if isinstance(response.content, list):
+            response_content = " ".join(response.content)
+        else:
+            response_content = response.content.strip()
         return {
             "messages": [response],
-            "final_report": response.content.strip(),
+            "final_report": response_content,
             "input_tokens": state.get("input_tokens", 0) + d_in,
             "output_tokens": state.get("output_tokens", 0) + d_out,
         }
 
-    def set_analysis_route(state: AgentState) -> dict:
-        """Record which analysis branch to use and return to after tools (orion vs generic)."""
-        if "orion" in state.get("failed_test", ""):
-            return {"analysis_route": "orion_analysis"}
-        return {"analysis_route": "generic_analysis"}
-
-    def route_by_analysis_branch(state: AgentState) -> str:
-        return state.get("analysis_route", "generic_analysis")
-
     workflow = StateGraph(AgentState)
-
     workflow.add_node("extract_job_info", extract_job_info)
-    workflow.add_node("set_job_state", set_job_state)
-    workflow.add_node("get_failed_test", get_failed_test)
-    workflow.add_node("set_analysis_route", set_analysis_route)
-    workflow.add_node("orion_analysis", orion_analysis)
-    workflow.add_node("generic_analysis", generic_analysis)
+    workflow.add_node("get_failed_test_info", get_failed_test_info)
+    workflow.add_node("classify_failed_test", classify_failed_test)
+    workflow.add_node("run_analysis", run_analysis)
     workflow.add_node("final_report", final_report)
-
-    workflow.add_node("tools", ToolNode(tools))
+    workflow.add_node("tools", ToolNode(ALL_TOOLS))
 
     # Define the flow
     workflow.add_edge(START, "extract_job_info")
-    workflow.add_edge("extract_job_info", "set_job_state")
     # Only conditional edges from set_job_state: an unconditional edge here would
     # still schedule get_failed_test even when passed_condition returns END.
-    workflow.add_conditional_edges("set_job_state", passed_condition)
-    workflow.add_edge("get_failed_test", "set_analysis_route")
+    workflow.add_conditional_edges("extract_job_info", passed_condition)
+    workflow.add_edge("get_failed_test_info", "classify_failed_test")
+    workflow.add_conditional_edges("classify_failed_test", tools_required, {"tools": "tools", "next": "run_analysis"})
     workflow.add_conditional_edges(
-        "set_analysis_route",
-        route_by_analysis_branch,
+        "run_analysis",
+        tools_required,
         {
-            "orion_analysis": "orion_analysis",
-            "generic_analysis": "generic_analysis",
-        },
+            "tools": "tools",
+            "next": "final_report",
+        }
     )
-    workflow.add_conditional_edges(
-        "orion_analysis",
-        _analysis_routes_to_tools,
-        {"tools": "tools", "final_report": "final_report"},
-    )
-    workflow.add_conditional_edges(
-        "generic_analysis",
-        _analysis_routes_to_tools,
-        {"tools": "tools", "final_report": "final_report"},
-    )
-
-    # Route tools back to the *same* analysis node only (never fan out to both).
     workflow.add_conditional_edges(
         "tools",
-        route_by_analysis_branch,
+        route_after_tools,
         {
-            "orion_analysis": "orion_analysis",
-            "generic_analysis": "generic_analysis",
+            "classify_failed_test": "classify_failed_test",
+            "run_analysis": "run_analysis",
         },
     )
     workflow.add_edge("final_report", END)

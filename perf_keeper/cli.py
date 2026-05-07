@@ -64,15 +64,13 @@ async def run_non_interactive(job_url: str, *, print_token_usage: bool = False):
     final = (result.get("final_report") or "").strip()
     if final:
         print(f"\n{final}\n")
-        if print_token_usage:
-            _print_token_totals(result)
-        return
-    messages = result.get("messages") or []
-    text = _last_diagnosis_text(messages)
-    if text:
-        print(f"\n{text}\n")
     else:
-        logger.warning("No assistant text to print (e.g. last turn was tool calls only).")
+        messages = result.get("messages") or []
+        text = _last_diagnosis_text(messages)
+        if text:
+            print(f"\n{text}\n")
+        else:
+            logger.warning("No final_report text and no assistant message to print.")
     if print_token_usage:
         _print_token_totals(result)
 
@@ -108,6 +106,21 @@ def main():
         level=getattr(logging, args.log_level.upper()),
         format="%(levelname)s %(name)s: %(message)s",
     )
+    # Keep our logs, suppress noisy dependency logs (MCP/LLM/http).
+    for noisy in (
+        "httpcore",
+        "mcp",
+        "google_genai",
+        "google",
+        "langchain",
+        "langchain_google_genai",
+        "langchain_mcp_adapters",
+        "langgraph",
+        "uvicorn.access",
+    ):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+    # Ensure our package logger honors the requested level.
+    logging.getLogger("perf_keeper").setLevel(getattr(logging, args.log_level.upper()))
     if args.server:
         uvicorn.run(app, host="0.0.0.0", port=args.port, log_level=args.log_level.lower())
         return

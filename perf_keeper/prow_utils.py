@@ -25,15 +25,13 @@ def extract_job_info(state: AgentState) -> dict:
                 job_name,
                 build_id,
             )
+            get_job_state(job_name, build_id)
             return {
                 "job_name": job_name,
                 "build_id": build_id,
             }
         else:
-            logger.warning(
-                "extract_job_info: no /logs/{job}/{build}/ pattern in URL: %s",
-                job_url,
-            )
+            logger.warning("extract_job_info: no /logs/{job}/{build}/ pattern in URL: %s", job_url)
             return {
                 "messages": [
                     SystemMessage(content=f"Couldn't extract job name and build id from URL: {job_url}"),
@@ -42,15 +40,11 @@ def extract_job_info(state: AgentState) -> dict:
     except Exception as e:
         logger.exception("extract_job_info: unexpected error while parsing URL")
         return {
-            "messages": [
-                SystemMessage(content=f"Error parsing URL: {e}"),
-            ]
+            "error": f"Error parsing URL: {e}",
         }
 
-def set_job_state(state: AgentState) -> bool:
+def get_job_state(job_name: str, build_id: str) -> bool:
     """Check if a job is failed by checking the finished.json file"""
-    job_name = state["job_name"]
-    build_id = state["build_id"]
     try:
         url = f"{PROW_ARTIFACTS_URL}/gcs/test-platform-results/logs/{job_name}/{build_id}/finished.json"
         resp = httpx.get(url)
@@ -61,18 +55,18 @@ def set_job_state(state: AgentState) -> bool:
             "passed": json_data.get("passed"),
         }
     except Exception as e:
+        logger.exception("get_job_state: unexpected error while checking job status")
         return {
-            "messages": [
-                SystemMessage(content=f"Error checking job status: {e}"),
-            ]
+            "error": f"Error checking job status: {e}",
         }
 
 def passed_condition(state: AgentState) -> str:
     if state.get("passed"):
         return END
-    return "get_failed_test"
+    return "get_failed_test_info"
 
-def get_failed_test(state: AgentState) -> dict:
+
+def get_failed_test_info(state: AgentState) -> dict:
     job_name = state["job_name"]
     build_id = state["build_id"]
     url = f"{PROW_ARTIFACTS_URL}/gcs/test-platform-results/logs/{job_name}/{build_id}/artifacts/ci-operator.log"
