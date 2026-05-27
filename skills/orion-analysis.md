@@ -18,7 +18,11 @@ You may use **only** the tools listed below.
 
 2. **`fetch_github_pull_request(pr_url)`** — GitHub **REST API** for a PR’s title, body, and labels. Required for every `https://github.com/<owner>/<repo>/pull/<number>` link (for example Orion “Related PRs”). **Do not** use `fetch_artifact` on `github.com/.../pull/...` pages; those return HTML.
 
-3. **`openshift-release(url)`** — MCP tools: `compare_releases` uses the **Sippy** payload diff API (PRs between two payload tags). `compare_rhcos_rpms` and `get_component_rpms` use the OpenShift release / RHCOS paths as before.
+3. **`compare_releases(payload1, payload2)`** — Compare two OCP payload versions via the **Sippy** payload diff API, showing PR differences between them.
+
+4. **`compare_rhcos_rpms(stream, version1, version2)`** — Compare RHCOS RPM packages between two OpenShift release payloads, showing added, removed, and updated packages.
+
+5. **`get_component_rpms(payload, component)`** — Get the list of RPMs included in a component of a release payload (e.g. ovn-kubernetes, etcd).
 
 The artifacts base URL is:
 
@@ -82,13 +86,22 @@ Follow these steps in order. Do not skip steps. Think carefully between each ste
 
 ### Step 1: Compare the payload versions
 
-If there's a performance regression derived from a different version of the payload, use the tool **`compare_releases`** from **`openshift-release`** to compare `regresssion_version` and `previous_version`. 
-Use the fucntion **`fetch_github_pull_request`** to get the PR title and description. Summarize each PR’s intent from the returned **title** and **body** in your Evidence section,
+If there’s a performance regression derived from a different version of the payload, use **`compare_releases`** to compare `regresssion_version` and `previous_version`. 
+Use **`fetch_github_pull_request`** to get the PR title and description. Summarize each PR’s intent from the returned **title** and **body** in your Evidence section,
 
 ### Step 2: Compare the RHCOS versions
 
-If the diff doesn't contain any relevant PR, compare the RHCOS RPM differences between the RHCOS (Red Hat Core OS) versions of the current and previous payload using the tool **`compare_rhcos_rpms`** from **`openshift-release`**
+If the diff doesn’t contain any relevant PR, compare the RHCOS RPM differences between the RHCOS (Red Hat Core OS) versions of the current and previous payload using **`compare_rhcos_rpms`**.
 
 ### Step 3: Compare the RPM differences
 
-And last resort, compare the RPM differences in the CNI component `ovn-kubernetes`, focusing in the `ovn` packages using the tool **`get_component_rpms`** from **`openshift-release`**
+And last resort, compare the RPM differences in the CNI component `ovn-kubernetes`, focusing in the `ovn` packages using **`get_component_rpms`**.
+
+### Step 4: Return the regressing version and the previous version
+
+Return the regressing version and the previous version in the following format:
+
+```
+Regressing version: `regressing_version`
+Previous version: `previous_version`
+```

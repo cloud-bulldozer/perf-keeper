@@ -26,9 +26,9 @@ The agent is built on [LangGraph](https://github.com/langchain-ai/langgraph) and
 |------|-------------|
 | `fetch_artifact` | Fetch text from any HTTP URL (CI logs, JSON reports, etc.) |
 | `fetch_github_pull_request` | Get PR metadata (title, body, labels, state) via GitHub REST API |
-| `compare_releases` | Compare two OCP payloads via Sippy to identify PR changes (MCP) |
-| `compare_rhcos_rpms` | Compare RHCOS RPM differences between versions (MCP) |
-| `get_component_rpms` | Retrieve component-specific RPM information (MCP) |
+| `compare_releases` | Compare two OCP payloads via Sippy to identify PR changes |
+| `compare_rhcos_rpms` | Compare RHCOS RPM differences between versions |
+| `get_component_rpms` | Retrieve component-specific RPM information |
 
 ## Prerequisites
 
@@ -36,7 +36,6 @@ The agent is built on [LangGraph](https://github.com/langchain-ai/langgraph) and
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - A Google Gemini API key
 - A GitHub personal access token (for PR analysis)
-- The [openshift-release MCP server](http://localhost:8000/mcp) running locally (for payload comparison tools)
 
 ## Installation
 
@@ -89,10 +88,6 @@ PROW_ARTIFACTS_URL=https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com
 PROW_DOMAIN=https://prow.ci.openshift.org
 EOF
 ```
-
-### MCP server
-
-The agent connects to an OpenShift Release MCP server at `http://localhost:8000/mcp` for payload comparison tools. Make sure this service is running before invoking the agent.
 
 ## CLI mode
 

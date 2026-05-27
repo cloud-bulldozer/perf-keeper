@@ -13,10 +13,18 @@ Produce **one** final report in the exact structure below. Use Markdown headings
 
 ## Job summary
 
-One short paragraph: what failed
+In case the job failed because of a regression, produce a table with the following format for each affected metric:
+
+``` 
+| Metric | Value | Percentage change | Test name |
+|--------|-------|------------------|-----------|
+| `metric_name` | `value` | `percentage_change` | `regressing_test` |
+```
 
 - Job URL: {job_url}
 - Failed test: {failed_test}
+- Regressing version: {regressing_version}
+- Previous version: {previous_version}
 
 ## Root cause
 

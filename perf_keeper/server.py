@@ -19,7 +19,7 @@ _agent = None
 async def lifespan(app: FastAPI):
     global _agent
     load_dotenv()
-    _agent = await create_agent()
+    _agent = create_agent()
     yield
 
 

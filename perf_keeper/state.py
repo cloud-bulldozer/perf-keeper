@@ -23,3 +23,7 @@ class AgentState(TypedDict):
     # Cumulative LLM token usage across analysis + final_report invocations.
     input_tokens: NotRequired[int]
     output_tokens: NotRequired[int]
+
+    # Regressing version and previous version
+    regressing_version: NotRequired[str]
+    previous_version: NotRequired[str]

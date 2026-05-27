@@ -55,8 +55,7 @@ def _print_token_totals(result: dict) -> None:
 
 async def run_non_interactive(job_url: str, *, print_token_usage: bool = False):
     logger = logging.getLogger(__name__)
-    load_dotenv()
-    agent = await create_agent()
+    agent = create_agent()
     result = await agent.ainvoke({"job_url": job_url})
     if result.get("passed"):
         logger.info("✅ Job passed. No diagnosis required.")
@@ -75,16 +74,10 @@ async def run_non_interactive(job_url: str, *, print_token_usage: bool = False):
         _print_token_totals(result)
 
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(description="OpenShift Perf & Scale Diagnosis Agent",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--prow-job-url", type=str, help="Prow job URL to diagnose (required)")
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default=os.environ.get("LOGLEVEL", "INFO"),
-        choices=("debug", "info", "warning", "error"),
-        help="Log level for agent progress (default: info, or LOGLEVEL env)",
-    )
     parser.add_argument(
         "--print-token-usage",
         action="store_true",
@@ -103,26 +96,24 @@ def main():
     )
     args = parser.parse_args()
     logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
+        level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper()),
         format="%(levelname)s %(name)s: %(message)s",
     )
-    # Keep our logs, suppress noisy dependency logs (MCP/LLM/http).
     for noisy in (
         "httpcore",
-        "mcp",
         "google_genai",
         "google",
         "langchain",
         "langchain_google_genai",
-        "langchain_mcp_adapters",
         "langgraph",
         "uvicorn.access",
+        "httpx",
     ):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     # Ensure our package logger honors the requested level.
-    logging.getLogger("perf_keeper").setLevel(getattr(logging, args.log_level.upper()))
+    logging.getLogger("perf_keeper").setLevel(getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper()))
     if args.server:
-        uvicorn.run(app, host="0.0.0.0", port=args.port, log_level=args.log_level.lower())
+        uvicorn.run(app, host="0.0.0.0", port=args.port, log_level=os.environ.get("LOG_LEVEL", "INFO").lower())
         return
     if args.prow_job_url:
         try:

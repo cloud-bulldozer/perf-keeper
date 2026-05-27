@@ -12,9 +12,13 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from perf_keeper.mcp_client import get_mcp_tools
 from perf_keeper.tools.artifact import fetch_artifact
 from perf_keeper.tools.github_pr import fetch_github_pull_request
+from perf_keeper.tools.openshift_release import (
+    compare_releases,
+    compare_rhcos_rpms,
+    get_component_rpms,
+)
 from perf_keeper.prow_utils import extract_job_info, passed_condition, get_failed_test_info
 from perf_keeper.state import AgentState
 
@@ -41,6 +45,9 @@ def _usage_from_ai_message(msg: BaseMessage) -> tuple[int, int]:
 TOOLS = [
     fetch_artifact,
     fetch_github_pull_request,
+    compare_releases,
+    compare_rhcos_rpms,
+    get_component_rpms,
 ]
 
 MODEL_NAME = os.getenv(
@@ -58,15 +65,13 @@ _USER_TASK = (
     "Diagnose this OpenShift prow job"
 )
 
-async def create_agent() -> StateGraph:
+def create_agent() -> StateGraph:
     """Create the LangGraph diagnosis agent."""
 
     logger.info(f"Using model: {MODEL_NAME}")
-    mcp_tools = await get_mcp_tools()
-    ALL_TOOLS = TOOLS + mcp_tools
     llm_base = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0)
-    llm_analysis_force_tools = llm_base.bind_tools(ALL_TOOLS, tool_choice="any")
-    llm_analysis_auto = llm_base.bind_tools(ALL_TOOLS)
+    llm_analysis_force_tools = llm_base.bind_tools(TOOLS, tool_choice="any")
+    llm_analysis_auto = llm_base.bind_tools(TOOLS)
 
     async def classify_failed_test(state: AgentState) -> dict:
         """Get the type of the failed test from the state."""
@@ -108,9 +113,6 @@ async def create_agent() -> StateGraph:
         # When the last turn is not tool output, require a tool call so analysis
         # cannot no-op (empty content, 0 output tokens) before the tool node runs.
         tail = prior[-1] if prior else None
-        # Bind ALL_TOOLS (artifact + GitHub + MCP). Binding only MCP tools forced
-        # bogus MCP calls (e.g. get_pull_request_info with url N/A) when the model
-        # needed fetch_artifact / fetch_github_pull_request per the skill.
         invoke_llm = (
             llm_analysis_force_tools
             if not isinstance(tail, ToolMessage)
@@ -123,11 +125,17 @@ async def create_agent() -> StateGraph:
         )
         response = invoke_llm.invoke(messages)
         d_in, d_out = _usage_from_ai_message(response)
-        return {
+        out = {
             "messages": [response],
             "input_tokens": state.get("input_tokens", 0) + d_in,
             "output_tokens": state.get("output_tokens", 0) + d_out,
         }
+        content = response.content if isinstance(response.content, str) else str(response.content)
+        if "Regressing version:" in content and "Previous version:" in content:
+            out["regressing_version"] = content.split("Regressing version: ")[1].split("\n")[0]
+            out["previous_version"] = content.split("Previous version: ")[1].split("\n")[0]
+            logger.info("Versions: %s → %s", out["previous_version"], out["regressing_version"])
+        return out
 
     def tools_required(state: AgentState) -> str:
         """Continue to tool execution, or to final report when the model returned text only."""
@@ -156,7 +164,12 @@ async def create_agent() -> StateGraph:
         """Single tool-free pass: structured Markdown from the full message history."""
         logger.info("Analysis Node: final_report")
         with open(f"{SKILLS_DIR}/final-report.md", "r") as f:
-            system_prompt = f.read().format(**state)
+            fmt_vars = {
+                "regressing_version": "N/A",
+                "previous_version": "N/A",
+                **state,
+            }
+            system_prompt = f.read().format(**fmt_vars)
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(
@@ -187,7 +200,7 @@ async def create_agent() -> StateGraph:
     workflow.add_node("classify_failed_test", classify_failed_test)
     workflow.add_node("run_analysis", run_analysis)
     workflow.add_node("final_report", final_report)
-    workflow.add_node("tools", ToolNode(ALL_TOOLS))
+    workflow.add_node("tools", ToolNode(TOOLS))
 
     # Define the flow
     workflow.add_edge(START, "extract_job_info")
