@@ -12,7 +12,7 @@ Produce **one** final report in the exact structure below. Use Markdown headings
 ## Required output structure
 Omit the sections that dont' contain any information.
 
-## Job summary
+## Analysis summary
 
 In case the job failed because of a regression, produce a table with the following format for each affected metric:
 
