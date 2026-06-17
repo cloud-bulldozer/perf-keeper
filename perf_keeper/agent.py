@@ -68,7 +68,7 @@ _USER_TASK = (
 def create_agent() -> StateGraph:
     """Create the LangGraph diagnosis agent."""
 
-    logger.info(f"Using model: {MODEL_NAME}")
+    logger.info("Using model: %s", MODEL_NAME)
     llm_base = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0)
     llm_analysis_force_tools = llm_base.bind_tools(TOOLS, tool_choice="any")
     llm_analysis_auto = llm_base.bind_tools(TOOLS)
@@ -101,7 +101,7 @@ def create_agent() -> StateGraph:
         failed_test_type = state.get("failed_test_type")
         prompt_file = f"{failed_test_type}-analysis.md" if failed_test_type else "generic-test-analysis.md"
         node_name = f"{failed_test_type}_analysis" if failed_test_type else "generic_analysis"
-        logger.info(f"Running analysis: {prompt_file}")
+        logger.info("Running analysis: %s", prompt_file)
         with open(f"{SKILLS_DIR}/{prompt_file}", "r") as f:
             system_prompt = f.read()
         prompt = system_prompt.format(**state,

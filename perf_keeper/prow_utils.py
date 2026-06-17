@@ -53,7 +53,7 @@ def get_job_state(job_name: str, build_id: str) -> bool:
         resp = httpx.get(url)
         resp.raise_for_status()
         json_data = resp.json()
-        logger.info(f"get_job_state: job passed: {json_data.get('passed')}")
+        logger.info("get_job_state: job passed: %s", json_data.get('passed'))
         return {
             "passed": json_data.get("passed"),
         }
@@ -82,7 +82,7 @@ def get_failed_test_info(state: AgentState) -> dict:
             step_name = re.search(r"could not run steps: step ([\w-]+)", line).group(1)
             pod_pattern = rf'pod \\?"{re.escape(step_name)}-([\w-]+)\\?"'
             test_name = re.search(pod_pattern, line).group(1)
-            logger.info(f"get_failed_test: failed step={step_name} failed test={test_name}")
+            logger.info("get_failed_test: failed step=%s failed test=%s", step_name, test_name)
             return {
                 "failed_step": step_name,
                 "failed_test": test_name,

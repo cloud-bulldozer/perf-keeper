@@ -177,6 +177,6 @@ def get_component_rpms(payload: str, component: str) -> str:
             return "\n".join(lines)
         logger.warning("No RPMs found in component image.")
     except subprocess.CalledProcessError as e:
-        logger.Error(f"Error getting component RPMs: {e.stderr or e}")
+        logger.error("Error getting component RPMs: %s", e.stderr or e)
     except Exception as e:
-        logger.error(f"Error getting component RPMs: {e}")
+        logger.error("Error getting component RPMs: %s", e)
