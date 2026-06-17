@@ -45,12 +45,12 @@ Fetch the regression report from the URL below using `fetch_artifact(url)`, this
 {artifacts_base}/gcs/test-platform-results/logs/{job_name}/{build_id}/artifacts/{failed_step}/{failed_test}/artifacts/orion-report-summary.txt
 ```
 
-Regressing benchmarks are reported as follows:
+Regressing benchmarks are reported as follows, for each changepoint:
 
 ```
 Regression(s) found :
 --------------------------------------------------
-Test:  `orion_test_name`:
+Test:  `failed_workload`:
 Changepoint at:       `regressing_version`
 Previous version:     `previous_version`
 Build:                `build_url`
@@ -61,11 +61,9 @@ Affected Metrics
 +=====================+=========+=====================+=================+
 |  `metric_name`      | `value` | `percentage_change`|  `jira_labels`   |
 +---------------------+---------+---------------------+-----------------+
-Related PRs (2):                                         
-  * `pr_url_1`
-  * `pr_url_2`
-  * ...
 ```
+
+> **⚠️ IMPORTANT: Do NOT read, fetch, or act on the "Related PRs" or "Commits" sections in the Orion report. Skip it entirely — those links are not used in this analysis.**
 
 ### B) Orion failure (failed test name contains the substring "openshift-qe-orion" and is different from "openshift-qe-orion-report")
 
@@ -90,7 +88,7 @@ Follow these steps in order. Do not skip steps. Think carefully between each ste
 
 ### Step 1: Fetch the Orion report and extract versions
 
-Fetch the Orion report or build log of the failed test (see **Orion test types** above) and extract `regressing_version`, `previous_version`, and the `Build` URL for each failing benchmark.
+Fetch the Orion report or build log of the failed test (see **Orion test types** above) and extract `regressing_version`, `previous_version`, `failed_workload` and the `Build` URL for each failing benchmark.
 
 ### Step 2: Compare versions differences
 
@@ -120,11 +118,13 @@ And last resort, compare the RPM differences in the CNI component `ovn-kubernete
 
 ### Step 6: Return the regressing version and the previous version
 
-Return the regressing version and the previous version in the following format:
+For each changepoint, return the regressing version and the previous version in the following format:
 
 ```
 Regressing version: `regressing_version`
 Previous version: `previous_version`
 Regressing UUID: `regressing_uuid`
 Previous UUID: `previous_uuid`
+Failed workload: `failed_workload`
+Metric: `metric_name`
 ```

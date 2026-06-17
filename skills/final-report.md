@@ -7,14 +7,15 @@
 
 # Task
 
-Produce **one** final report in the exact structure below. Use Markdown headings as shown. Be concise but specific: quote numbers, thresholds, alert names, exit codes, and PR titles **only** when they appear in the conversation.
+For each changepoint, produce a report with the exact structure below. Use Markdown headings as shown. Be concise but specific: quote numbers, thresholds, alert names, exit codes, and PR titles **only** when they appear in the conversation.
 
 ## Required output structure
+
 Omit the sections that dont' contain any information.
 
-## Analysis summary
+# Analysis for `metric_name`
 
-In case the job failed because of a regression, produce a table with the following format for each affected metric:
+In case the job failed because of a regression, produce a table with the following format:
 
 ``` 
 | Metric | Value | Percentage change | Test name |
@@ -25,17 +26,17 @@ In case the job failed because of a regression, produce a table with the followi
 Also include the following information, don't include it if it's not available:
 
 - Job URL: `{job_url}`
-- Failed test: `{failed_test}`
+- Failed workload: `{failed_workload}`
 - Regressing version: `{regressing_version}`
 - Previous version: `{previous_version}`
 
 ## Root cause
 
-Paragraph(s) explaining the chain from evidence to conclusion. If the conversation gave competing hypotheses, state the leading one and what would falsify it.
+Paragraph(s) explaining the chain from evidence to conclusion without repeating information from the previous sections. If the conversation gave competing hypotheses, state the leading one and what would falsify it.
 
 ## Suspect changes
 
-If payload / RHCOS / component RPM / GitHub PR analysis was discussed, enumerate only the relevant changes here. Use the following format:
+If payload / RHCOS / component RPM / GitHub PR analysis was discussed, enumerate only the suspect changes here (ignore changes that are not related to the root cause). Use the following format:
 
 - PR URL: <PR_URL> - <PR_DESCRIPTION>
 
