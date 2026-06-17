@@ -41,23 +41,19 @@ The agent is built on [LangGraph](https://github.com/langchain-ai/langgraph) and
 - A Google Gemini API key
 - A GitHub personal access token (for PR analysis)
 
-## Installation
+## Installation 
 
 ```bash
 # Clone the repository
 git clone <repo-url>
 cd perf-keeper
 
+# Create virtual environment
+uv venv
+source .venv/bin/activate
+
 # Install dependencies with uv (recommended)
 uv sync
-
-# Or with pip
-pip install -e .
-
-# For development dependencies (pytest, etc.)
-uv sync --extra dev
-# or
-pip install -e ".[dev]"
 ```
 
 ## Configuration
