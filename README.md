@@ -103,7 +103,7 @@ Monitor Prow jobs continuously and automatically analyze failures:
 perf-keeper --watch
 
 # Analyze jobs completed after a specific date
-perf-keeper --watch --since 2026-06-01
+perf-keeper --watch --since 2026-06-01 # ISO format: YYYY-MM-DD
 
 # Use a custom config file
 perf-keeper --config /path/to/config.yaml --watch
