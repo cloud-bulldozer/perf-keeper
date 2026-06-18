@@ -45,6 +45,7 @@ If payload / RHCOS / component RPM / GitHub PR analysis was discussed, enumerate
 Pick **exactly one** label (use this exact token on the line after the heading):
 
 - `performance-regression`
+- `false-positive`
 - `test-error`
 - `alerting-violation`
 - `measurement-threshold`

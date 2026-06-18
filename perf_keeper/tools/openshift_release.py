@@ -145,7 +145,10 @@ def get_component_rpms(payload: str, component: str) -> str:
     try:
         logger.info("Getting component RPMs for %s in %s", component, payload)
         if "nightly" in payload or ".ci-" in payload:
-            image_ref = f"registry.ci.openshift.org/ocp/release:{payload}"
+            if payload.startswith("5."):
+                image_ref = f"registry.ci.openshift.org/ocp/release-5:{payload}"
+            else:
+                image_ref = f"registry.ci.openshift.org/ocp/release:{payload}"
         else:
             image_ref = f"quay.io/openshift-release-dev/ocp-release:{payload}-x86_64"
         cmd = ["oc", "adm", "release", "info", image_ref, f"--image-for={component}"]
@@ -154,19 +157,13 @@ def get_component_rpms(payload: str, component: str) -> str:
         if result.returncode != 0:
             logger.error("Error getting component RPMs: %s", result.stderr.strip())
         component_image = result.stdout.strip()
-        cmd = ["podman", "run", "--rm", "--entrypoint", "rpm", component_image,
-               "-qa", "--queryformat", "%{NAME} %{EPOCH} %{VERSION} %{RELEASE} %{ARCH}"]
+        cmd = ["podman", "run", "--rm", "--entrypoint", "rpm", component_image, "-qa"]
         logger.info("Running command: %s", " ".join(cmd))
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=300)
         if result.returncode != 0:
             logger.error("Error getting component RPMs: %s", result.stderr.strip())
-        lines: list[str] = []
-        for line in result.stdout.splitlines():
-            parts = line.split(None, 4)
-            if len(parts) == 5:
-                lines.append(f"{parts[0]}-{parts[2]}-{parts[3]} (epoch={parts[1]}, arch={parts[4]})")
-        if lines:
-            return "\n".join(lines)
+        if result.stdout:
+            return result.stdout
         logger.warning("No RPMs found in component image.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Error getting component RPMs: {e.stderr or e}")
