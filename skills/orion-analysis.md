@@ -24,7 +24,7 @@ You may use **only** the tools listed below.
 
 5. **`compare_releases(payload1, payload2)`** — Compare two OCP payload versions via the **Sippy** payload diff API, showing PR differences between them.
 
-6. **`compare_rhcos_rpms(stream, version1, version2)`** — Compare RHCOS RPM packages between two OpenShift release payloads, showing added, removed, and updated packages.
+6. **`compare_rhcos_rpms(stream, version1, version2)`** — Compare RHCOS RPM packages between two OpenShift release payloads, showing added, removed, and updated packages. Also compares the host OS overlay image RPMs (`rhel-coreos` / `rhel-coreos-10`) which include layered packages such as cri-o, openvswitch, kubelet, and other OpenShift-specific RPMs not present in the base RHCOS compose.
 
 7. **`get_component_rpms(payload, component)`** — Get the list of RPMs included in a component of a release payload (e.g. ovn-kubernetes, etcd).
 
